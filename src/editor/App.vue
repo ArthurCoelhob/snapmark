@@ -31,11 +31,12 @@
       </v-list>
     </v-navigation-drawer>
 
-    <v-main class="bg-grey-lighten-4">
-      <v-container fluid class="fill-height d-flex align-center justify-center">
+    <v-main class="editor-main">
+      <v-container fluid class="editor-content fill-height d-flex align-center justify-center">
         <div class="canvas-container elevation-3 bg-white">
-          <div class="text-subtitle-1 text-grey-darken-1 pa-8">
-            Nenhuma imagem carregada. Capture uma aba para começar.
+          <img v-if="imageUrl" :src="imageUrl" alt="Captura da aba" class="captured-image" />
+          <div v-else class="empty-state text-subtitle-1 text-grey-darken-1">
+            Nenhuma imagem carregada. Faça uma captura para começar.
           </div>
         </div>
       </v-container>
@@ -44,17 +45,56 @@
 </template>
 
 <script setup lang="ts">
+import { ref, onMounted } from 'vue';
+
+const imageUrl = ref<string | null>(null);
+
+onMounted(() => {
+  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+    chrome.storage.local.get('capturedImage', (result) => {
+      if (!result.capturedImage) {
+        return;
+      }
+      imageUrl.value = result.capturedImage;
+    });
+  }
+});
 </script>
 
 <style scoped>
+.editor-main {
+  background: #f3f4f6;
+}
+
+.editor-content {
+  padding: 16px;
+}
+
 .canvas-container {
-  min-width: 600px;
-  min-height: 400px;
+  max-width: min(94vw, 1600px);
+  max-height: calc(100vh - 88px);
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 8px;
+  padding: 6px;
+  overflow: hidden;
 }
+
+.captured-image {
+  max-width: min(94vw, 1600px);
+  max-height: calc(100vh - 108px);
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  display: block;
+}
+
+.empty-state {
+  padding: 32px;
+  text-align: center;
+}
+
 .gap-2 {
   gap: 8px;
 }
