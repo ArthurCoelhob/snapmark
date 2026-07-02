@@ -4,6 +4,8 @@ import vuetify from 'vite-plugin-vuetify';
 import { resolve } from 'path';
 
 export default defineConfig({
+    root: resolve(__dirname, '.'),
+    base: '/',
     plugins: [
         vue(),
         vuetify({ autoImport: true }),
