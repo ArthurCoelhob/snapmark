@@ -1,0 +1,19 @@
+{
+    "manifest_version": 3,
+    "name": "SnapMark",
+    "version": "1.0.0",
+    "description": "Capture a aba atual do navegador, abra o editor e faça anotações antes de exportar.",
+    "permissions": [
+        "activeTab",
+        "storage"
+    ],
+    "background": {
+        "service_worker": "background.js",
+        "type": "module"
+    },
+    "action": {
+        "default_popup": "src/popup/index.html",
+        "default_title": "SnapMark"
+    },
+    "minimum_chrome_version": "88"
+}

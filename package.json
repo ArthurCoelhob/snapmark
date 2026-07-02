@@ -1,0 +1,28 @@
+{
+  "name": "snapmark",
+  "version": "1.0.0",
+  "description": "Chrome Extension to capture tabs and annotate screenshots",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@mdi/font": "^7.4.47",
+    "pinia": "^2.1.7",
+    "vue": "^3.4.21",
+    "vuetify": "^3.5.12"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.263",
+    "@types/node": "^20.11.24",
+    "@vitejs/plugin-vue": "^5.0.4",
+    "sass": "^1.71.1",
+    "typescript": "5.2.2",
+    "vite": "^5.1.4",
+    "vite-plugin-vuetify": "^2.0.1",
+    "vue-tsc": "^1.8.27"
+  }
+}

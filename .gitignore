@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+.pnpm-debug.log*
+
+# Production build output
+dist/
+
+# IDEs and Editors
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+Thumbs.db
+
+# Local env files
+.env*.local
+
+# Log files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# TypeScript cache
+tsconfig.tsbuildinfo
+
+# Project roadmap
+SnapMark.md
