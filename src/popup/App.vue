@@ -108,7 +108,7 @@ body,
   height: 40px;
   border: 0;
   border-radius: 8px;
-  background: #111827;
+  background: #4f46e5;
   color: #ffffff;
   font-size: 13px;
   font-weight: 600;
@@ -117,7 +117,7 @@ body,
 }
 
 .capture-btn:hover:not(:disabled) {
-  background: #1f2937;
+  background: #4338ca;
 }
 
 .capture-btn:disabled {

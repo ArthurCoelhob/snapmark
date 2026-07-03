@@ -1,101 +1,204 @@
 <template>
-  <v-app>
-    <v-app-bar color="primary" density="compact" flat>
-      <v-app-bar-title class="font-weight-bold">SnapMark Editor</v-app-bar-title>
-      <v-spacer></v-spacer>
-      <v-btn icon="mdi-undo" disabled></v-btn>
-      <v-btn icon="mdi-redo" disabled></v-btn>
-      <v-divider vertical class="mx-2"></v-divider>
-      <v-btn color="success" variant="elevated" prepend-icon="mdi-download" class="mr-2">
-        Exportar
-      </v-btn>
-    </v-app-bar>
+  <v-app class="editor-shell">
+    <EditorHeader
+      v-model:project-title="projectTitle"
+      :zoom-disabled="!imageUrl"
+      :zoom-percent="zoomPercent"
+      @zoom-in="zoomIn"
+      @zoom-out="zoomOut"
+      @fit="resetView"
+      @set100="setZoomPercent(100)"
+      @reset-view="resetView"
+      @preview="handlePreview"
+      @export="handleExport"
+      @undo="noop"
+      @redo="noop"
+    />
 
-    <v-navigation-drawer permanent width="80" rail>
-      <v-list density="compact" nav class="d-flex flex-column align-center py-4 gap-2">
-        <v-list-item value="select" active color="primary" class="mb-2">
-          <v-icon size="large">mdi-cursor-default</v-icon>
-        </v-list-item>
-        <v-list-item value="arrow" color="primary" class="mb-2">
-          <v-icon size="large">mdi-arrow-top-left</v-icon>
-        </v-list-item>
-        <v-list-item value="rect" color="primary" class="mb-2">
-          <v-icon size="large">mdi-rectangle-outline</v-icon>
-        </v-list-item>
-        <v-list-item value="circle" color="primary" class="mb-2">
-          <v-icon size="large">mdi-circle-outline</v-icon>
-        </v-list-item>
-        <v-list-item value="text" color="primary" class="mb-2">
-          <v-icon size="large">mdi-format-text</v-icon>
-        </v-list-item>
-      </v-list>
-    </v-navigation-drawer>
+    <div class="editor-layout">
+      <aside class="editor-sidebar">
+        <button class="tool-btn tool-btn--active" type="button" title="Selecionar">
+          <v-icon :size="18">mdi-cursor-default</v-icon>
+        </button>
+        <button class="tool-btn" type="button" title="Seta">
+          <v-icon :size="18">mdi-arrow-top-left</v-icon>
+        </button>
+        <button class="tool-btn" type="button" title="Retângulo">
+          <v-icon :size="18">mdi-rectangle-outline</v-icon>
+        </button>
+        <button class="tool-btn" type="button" title="Círculo">
+          <v-icon :size="18">mdi-circle-outline</v-icon>
+        </button>
+        <button class="tool-btn" type="button" title="Texto">
+          <v-icon :size="18">mdi-format-text</v-icon>
+        </button>
+      </aside>
 
-    <v-main class="editor-main">
-      <v-container fluid class="editor-content fill-height d-flex align-center justify-center">
-        <div class="canvas-container elevation-3 bg-white">
-          <img v-if="imageUrl" :src="imageUrl" alt="Captura da aba" class="captured-image" />
-          <div v-else class="empty-state text-subtitle-1 text-grey-darken-1">
-            Nenhuma imagem carregada. Faça uma captura para começar.
+      <main class="editor-main">
+        <div class="editor-content">
+          <div ref="canvasContainerRef" class="canvas-container">
+            <canvas
+              v-if="imageUrl"
+              ref="canvasRef"
+              class="editor-canvas"
+              @wheel.prevent="handleWheel"
+              @mousedown="handleMouseDown"
+              @contextmenu.prevent
+            ></canvas>
+            <div v-else class="empty-state">
+              Nenhuma imagem carregada. Faça uma captura para começar.
+            </div>
           </div>
         </div>
-      </v-container>
-    </v-main>
+      </main>
+    </div>
   </v-app>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
+import EditorHeader from './components/EditorHeader.vue';
+import { useEditorCanvas } from './composables/useEditorCanvas';
 
-const imageUrl = ref<string | null>(null);
+const {
+  imageUrl,
+  zoomPercent,
+  canvasRef,
+  canvasContainerRef,
+  resetView,
+  zoomIn,
+  zoomOut,
+  setZoomPercent,
+  handleWheel,
+  handleMouseDown,
+  initialize,
+  cleanup,
+} = useEditorCanvas();
+
+const projectTitle = ref('Projeto sem nome');
+
+const noop = (): void => undefined;
+
+const handlePreview = (): void => {
+  const canvas = canvasRef.value;
+  if (!canvas) {
+    return;
+  }
+  const dataUrl = canvas.toDataURL('image/png');
+  window.open(dataUrl, '_blank', 'noopener,noreferrer');
+};
+
+const handleExport = (): void => {
+  const canvas = canvasRef.value;
+  if (!canvas) {
+    return;
+  }
+  const link = document.createElement('a');
+  link.href = canvas.toDataURL('image/png');
+  link.download = `${projectTitle.value.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}.png`;
+  link.click();
+};
 
 onMounted(() => {
-  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-    chrome.storage.local.get('capturedImage', (result) => {
-      if (!result.capturedImage) {
-        return;
-      }
-      imageUrl.value = result.capturedImage;
-    });
-  }
+  initialize();
+});
+
+onBeforeUnmount(() => {
+  cleanup();
 });
 </script>
 
 <style scoped>
-.editor-main {
+.editor-shell {
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.editor-layout {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  min-height: calc(100vh - 64px);
+}
+
+.editor-sidebar {
+  border-right: 1px solid #e5e7eb;
+  background: #f8fafc;
+  padding: 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.tool-btn {
+  width: 40px;
+  height: 40px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: #4b5563;
+  cursor: pointer;
+  transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease;
+}
+
+.tool-btn:hover {
   background: #f3f4f6;
+  border-color: #e5e7eb;
+}
+
+.tool-btn--active {
+  background: #e0e7ff;
+  color: #3730a3;
+  border-color: #c7d2fe;
 }
 
 .editor-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
   padding: 16px;
+  background: #f3f4f6;
 }
 
 .canvas-container {
   max-width: min(94vw, 1600px);
   max-height: calc(100vh - 88px);
+  width: 100%;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
-  padding: 6px;
+  border-radius: 14px;
+  padding: 10px;
+  border: 1px solid #d7dee8;
+  box-shadow: 0 18px 34px rgba(15, 23, 42, 0.1), 0 3px 10px rgba(15, 23, 42, 0.08);
+  background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
   overflow: hidden;
 }
 
-.captured-image {
-  max-width: min(94vw, 1600px);
-  max-height: calc(100vh - 108px);
-  width: auto;
-  height: auto;
-  object-fit: contain;
+.editor-canvas {
+  width: 100%;
+  height: 100%;
   display: block;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
 }
 
 .empty-state {
   padding: 32px;
   text-align: center;
+  color: #6b7280;
 }
 
-.gap-2 {
-  gap: 8px;
+@media (max-width: 980px) {
+  .editor-layout {
+    grid-template-columns: 60px minmax(0, 1fr);
+  }
+
+  .tool-btn {
+    width: 36px;
+    height: 36px;
+  }
 }
 </style>
