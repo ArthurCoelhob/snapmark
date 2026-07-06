@@ -1,7 +1,6 @@
 <template>
   <v-app class="editor-shell">
     <EditorHeader
-      v-model:project-title="projectTitle"
       :zoom-disabled="!imageUrl"
       :zoom-percent="zoomPercent"
       @zoom-in="zoomIn"
@@ -17,20 +16,41 @@
 
     <div class="editor-layout">
       <aside class="editor-sidebar">
-        <button class="tool-btn tool-btn--active" type="button" title="Selecionar">
+        <button
+          class="tool-btn"
+          :class="{ 'tool-btn--active': activeTool === 'select' }"
+          type="button"
+          title="Selecionar"
+          @click="setActiveTool('select')"
+        >
           <v-icon :size="18">mdi-cursor-default</v-icon>
         </button>
-        <button class="tool-btn" type="button" title="Seta">
+        <button
+          class="tool-btn"
+          :class="{ 'tool-btn--active': activeTool === 'arrow' }"
+          type="button"
+          title="Seta"
+          @click="setActiveTool('arrow')"
+        >
           <v-icon :size="18">mdi-arrow-top-left</v-icon>
         </button>
-        <button class="tool-btn" type="button" title="Retângulo">
+        <button
+          class="tool-btn"
+          :class="{ 'tool-btn--active': activeTool === 'rect' }"
+          type="button"
+          title="Retângulo"
+          @click="setActiveTool('rect')"
+        >
           <v-icon :size="18">mdi-rectangle-outline</v-icon>
         </button>
-        <button class="tool-btn" type="button" title="Círculo">
+        <button
+          class="tool-btn"
+          :class="{ 'tool-btn--active': activeTool === 'circle' }"
+          type="button"
+          title="Círculo"
+          @click="setActiveTool('circle')"
+        >
           <v-icon :size="18">mdi-circle-outline</v-icon>
-        </button>
-        <button class="tool-btn" type="button" title="Texto">
-          <v-icon :size="18">mdi-format-text</v-icon>
         </button>
       </aside>
 
@@ -56,7 +76,7 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { onBeforeUnmount, onMounted } from 'vue';
 import EditorHeader from './components/EditorHeader.vue';
 import { useEditorCanvas } from './composables/useEditorCanvas';
 
@@ -69,33 +89,33 @@ const {
   zoomIn,
   zoomOut,
   setZoomPercent,
+  activeTool,
+  setActiveTool,
   handleWheel,
   handleMouseDown,
+  getOutputDataUrl,
   initialize,
   cleanup,
 } = useEditorCanvas();
 
-const projectTitle = ref('Projeto sem nome');
-
 const noop = (): void => undefined;
 
 const handlePreview = (): void => {
-  const canvas = canvasRef.value;
-  if (!canvas) {
+  const dataUrl = getOutputDataUrl();
+  if (!dataUrl) {
     return;
   }
-  const dataUrl = canvas.toDataURL('image/png');
   window.open(dataUrl, '_blank', 'noopener,noreferrer');
 };
 
 const handleExport = (): void => {
-  const canvas = canvasRef.value;
-  if (!canvas) {
+  const dataUrl = getOutputDataUrl();
+  if (!dataUrl) {
     return;
   }
   const link = document.createElement('a');
-  link.href = canvas.toDataURL('image/png');
-  link.download = `${projectTitle.value.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}.png`;
+  link.href = dataUrl;
+  link.download = `snapmark-capture-${Date.now()}.png`;
   link.click();
 };
 
@@ -169,7 +189,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   border-radius: 14px;
-  padding: 10px;
+  padding: 0;
   border: 1px solid #d7dee8;
   box-shadow: 0 18px 34px rgba(15, 23, 42, 0.1), 0 3px 10px rgba(15, 23, 42, 0.08);
   background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
@@ -180,8 +200,8 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   display: block;
-  border-radius: 10px;
-  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  border: none;
   background: #ffffff;
 }
 

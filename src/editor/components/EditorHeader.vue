@@ -5,26 +5,6 @@
         <div class="brand__logo" aria-hidden="true"></div>
         <span class="brand__name">SnapMark Editor</span>
       </div>
-      <span class="separator" aria-hidden="true"></span>
-      <input
-        v-if="isEditingTitle"
-        ref="projectTitleInputRef"
-        v-model="projectTitleDraft"
-        class="project-title-input"
-        maxlength="80"
-        @blur="saveTitle"
-        @keydown.enter.prevent="saveTitle"
-        @keydown.esc.prevent="cancelTitleEdit"
-      />
-      <button
-        v-else
-        class="project-title-button"
-        type="button"
-        :title="projectTitle"
-        @click="startTitleEdit"
-      >
-        {{ projectTitle }}
-      </button>
     </div>
 
     <div class="group group-center">
@@ -65,16 +45,12 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, ref } from 'vue';
-
-const props = defineProps<{
-  projectTitle: string;
+defineProps<{
   zoomPercent: number;
   zoomDisabled?: boolean;
 }>();
 
-const emit = defineEmits<{
-  (event: 'update:projectTitle', value: string): void;
+defineEmits<{
   (event: 'zoomIn'): void;
   (event: 'zoomOut'): void;
   (event: 'fit'): void;
@@ -85,29 +61,6 @@ const emit = defineEmits<{
   (event: 'preview'): void;
   (event: 'export'): void;
 }>();
-
-const isEditingTitle = ref(false);
-const projectTitleDraft = ref(props.projectTitle);
-const projectTitleInputRef = ref<HTMLInputElement | null>(null);
-
-const startTitleEdit = async (): Promise<void> => {
-  projectTitleDraft.value = props.projectTitle;
-  isEditingTitle.value = true;
-  await nextTick();
-  projectTitleInputRef.value?.focus();
-  projectTitleInputRef.value?.select();
-};
-
-const saveTitle = (): void => {
-  const normalizedTitle = projectTitleDraft.value.trim() || 'Projeto sem nome';
-  emit('update:projectTitle', normalizedTitle);
-  isEditingTitle.value = false;
-};
-
-const cancelTitleEdit = (): void => {
-  projectTitleDraft.value = props.projectTitle;
-  isEditingTitle.value = false;
-};
 </script>
 
 <style scoped>
@@ -160,44 +113,6 @@ const cancelTitleEdit = (): void => {
   font-weight: 600;
   color: #111827;
   white-space: nowrap;
-}
-
-.separator {
-  width: 1px;
-  height: 20px;
-  background: #e5e7eb;
-}
-
-.project-title-button {
-  max-width: 240px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: #374151;
-  font-size: 14px;
-  font-weight: 500;
-  padding: 6px 8px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  cursor: pointer;
-  transition: background-color 180ms ease;
-}
-
-.project-title-button:hover {
-  background: #f3f4f6;
-}
-
-.project-title-input {
-  width: 220px;
-  height: 34px;
-  border-radius: 8px;
-  border: 1px solid #d1d5db;
-  background: #ffffff;
-  color: #111827;
-  font-size: 14px;
-  font-weight: 500;
-  padding: 0 10px;
 }
 
 .zoom-pill {
@@ -318,16 +233,9 @@ button:disabled {
 }
 
 @media (max-width: 980px) {
-  .separator,
-  .preview-label,
-  .reset-label {
+  .reset-label,
+  .preview-label {
     display: none;
-  }
-
-  .project-title-button,
-  .project-title-input {
-    max-width: 140px;
-    width: 140px;
   }
 }
 </style>
