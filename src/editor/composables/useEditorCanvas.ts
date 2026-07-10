@@ -1,17 +1,14 @@
 import { storeToRefs } from 'pinia';
 import { ref } from 'vue';
+import { renderCanvasScene, renderOutputCanvas, type CanvasCamera } from '../render/renderCanvas';
+import { getCapturedImage } from '../services/capturedImageService';
 import { useCanvasStore } from '../stores/canvasStore';
-import type { ArrowElement, CanvasElement, CircleElement, Point, RectElement, ToolType } from '../types/canvas';
+import type { Point, ToolType } from '../types/canvas';
+import { createCanvasElementDraft, isDrawableElement } from '../utils/canvasElements';
 
 const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 6;
 const ZOOM_FACTOR = 1.1;
-
-type CameraState = {
-  scale: number;
-  offsetX: number;
-  offsetY: number;
-};
 
 const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
 
@@ -24,7 +21,7 @@ export const useEditorCanvas = () => {
   const canvasRef = ref<HTMLCanvasElement | null>(null);
   const canvasContainerRef = ref<HTMLElement | null>(null);
 
-  const camera: CameraState = {
+  const camera: CanvasCamera = {
     scale: 1,
     offsetX: 0,
     offsetY: 0,
@@ -41,61 +38,7 @@ export const useEditorCanvas = () => {
   let drawingStartPoint: Point | null = null;
 
   const updateZoomPercent = (): void => {
-    if (fitScale <= 0) {
-      zoomPercent.value = 100;
-      return;
-    }
-    zoomPercent.value = Math.round((camera.scale / fitScale) * 100);
-  };
-
-  const drawArrowHead = (
-    context: CanvasRenderingContext2D,
-    fromX: number,
-    fromY: number,
-    toX: number,
-    toY: number,
-    strokeWidth: number,
-  ): void => {
-    const angle = Math.atan2(toY - fromY, toX - fromX);
-    const headLength = Math.max(10, strokeWidth * 4);
-
-    context.beginPath();
-    context.moveTo(toX, toY);
-    context.lineTo(
-      toX - headLength * Math.cos(angle - Math.PI / 6),
-      toY - headLength * Math.sin(angle - Math.PI / 6),
-    );
-    context.moveTo(toX, toY);
-    context.lineTo(
-      toX - headLength * Math.cos(angle + Math.PI / 6),
-      toY - headLength * Math.sin(angle + Math.PI / 6),
-    );
-    context.stroke();
-  };
-
-  const drawElement = (context: CanvasRenderingContext2D, element: CanvasElement): void => {
-    context.strokeStyle = element.strokeColor;
-    context.lineWidth = element.strokeWidth;
-    context.lineCap = 'round';
-    context.lineJoin = 'round';
-
-    if (element.type === 'rect') {
-      context.strokeRect(element.x, element.y, element.width, element.height);
-      return;
-    }
-
-    if (element.type === 'circle') {
-      context.beginPath();
-      context.ellipse(element.cx, element.cy, element.rx, element.ry, 0, 0, Math.PI * 2);
-      context.stroke();
-      return;
-    }
-
-    context.beginPath();
-    context.moveTo(element.x1, element.y1);
-    context.lineTo(element.x2, element.y2);
-    context.stroke();
-    drawArrowHead(context, element.x1, element.y1, element.x2, element.y2, element.strokeWidth);
+    zoomPercent.value = Math.round(camera.scale * 100);
   };
 
   const getOutputDataUrl = (): string | null => {
@@ -112,12 +55,7 @@ export const useEditorCanvas = () => {
       return null;
     }
 
-    context.fillStyle = '#ffffff';
-    context.fillRect(0, 0, outputCanvas.width, outputCanvas.height);
-    context.drawImage(imageElement, 0, 0);
-    elements.value.forEach((element) => {
-      drawElement(context, element);
-    });
+    renderOutputCanvas(context, imageElement, elements.value);
 
     return outputCanvas.toDataURL('image/png');
   };
@@ -143,31 +81,19 @@ export const useEditorCanvas = () => {
       return;
     }
 
-    context.setTransform(dpr, 0, 0, dpr, 0, 0);
-    context.clearRect(0, 0, width, height);
-    context.fillStyle = '#ffffff';
-    context.fillRect(0, 0, width, height);
-
-    if (!imageElement) {
-      return;
-    }
-
-    context.save();
-    context.translate(camera.offsetX, camera.offsetY);
-    context.scale(camera.scale, camera.scale);
-    context.imageSmoothingEnabled = true;
-    context.imageSmoothingQuality = 'high';
-    context.drawImage(imageElement, 0, 0);
-    elements.value.forEach((element) => {
-      drawElement(context, element);
+    renderCanvasScene({
+      context,
+      width,
+      height,
+      dpr,
+      imageElement,
+      camera,
+      elements: elements.value,
+      draftElement: draftElement.value,
     });
-    if (draftElement.value) {
-      drawElement(context, draftElement.value);
-    }
-    context.restore();
   };
 
-  const fitImageToView = (): void => {
+  const centerImageAtScale = (scale: number): void => {
     const container = canvasContainerRef.value;
     if (!container || !imageElement) {
       return;
@@ -175,16 +101,27 @@ export const useEditorCanvas = () => {
 
     const width = container.clientWidth;
     const height = container.clientHeight;
-    const scaleX = width / imageElement.width;
-    const scaleY = height / imageElement.height;
 
-    fitScale = clamp(Math.min(scaleX, scaleY), MIN_ZOOM, MAX_ZOOM);
-    camera.scale = fitScale;
+    camera.scale = clamp(scale, MIN_ZOOM, MAX_ZOOM);
     camera.offsetX = (width - imageElement.width * camera.scale) / 2;
     camera.offsetY = (height - imageElement.height * camera.scale) / 2;
     updateZoomPercent();
-
     requestRender();
+  };
+
+  /**
+   * Fits the full captured image inside the current viewport.
+   */
+  const fitToView = (): void => {
+    const container = canvasContainerRef.value;
+    if (!container || !imageElement) {
+      return;
+    }
+
+    const scaleX = container.clientWidth / imageElement.width;
+    const scaleY = container.clientHeight / imageElement.height;
+    fitScale = clamp(Math.min(scaleX, scaleY), MIN_ZOOM, MAX_ZOOM);
+    centerImageAtScale(fitScale);
   };
 
   const clearTransientInteractionState = (): void => {
@@ -195,9 +132,19 @@ export const useEditorCanvas = () => {
     setPanCursor();
   };
 
+  /**
+   * Returns the editor to its default safe view and cancels in-progress input.
+   */
   const resetView = (): void => {
     clearTransientInteractionState();
-    fitImageToView();
+    fitToView();
+  };
+
+  /**
+   * Shows the image at its natural size: one image pixel per canvas CSS pixel.
+   */
+  const setActualSize = (): void => {
+    centerImageAtScale(1);
   };
 
   const setPanCursor = (): void => {
@@ -219,56 +166,13 @@ export const useEditorCanvas = () => {
     canvas.style.cursor = isSpacePressed ? 'grab' : 'default';
   };
 
+  /**
+   * Converts pointer coordinates from viewport space into image/world space.
+   */
   const screenToWorld = (screenX: number, screenY: number): Point => ({
     x: (screenX - camera.offsetX) / camera.scale,
     y: (screenY - camera.offsetY) / camera.scale,
   });
-
-  const createDraftShape = (start: Point, current: Point): CanvasElement => {
-    const id = canvasStore.createElementId();
-    const strokeColor = canvasStore.strokeColor;
-    const strokeWidth = canvasStore.strokeWidth;
-
-    if (activeTool.value === 'rect') {
-      const rect: RectElement = {
-        id,
-        type: 'rect',
-        strokeColor,
-        strokeWidth,
-        x: Math.min(start.x, current.x),
-        y: Math.min(start.y, current.y),
-        width: Math.abs(current.x - start.x),
-        height: Math.abs(current.y - start.y),
-      };
-      return rect;
-    }
-
-    if (activeTool.value === 'circle') {
-      const circle: CircleElement = {
-        id,
-        type: 'circle',
-        strokeColor,
-        strokeWidth,
-        cx: (start.x + current.x) / 2,
-        cy: (start.y + current.y) / 2,
-        rx: Math.abs(current.x - start.x) / 2,
-        ry: Math.abs(current.y - start.y) / 2,
-      };
-      return circle;
-    }
-
-    const arrow: ArrowElement = {
-      id,
-      type: 'arrow',
-      strokeColor,
-      strokeWidth,
-      x1: start.x,
-      y1: start.y,
-      x2: current.x,
-      y2: current.y,
-    };
-    return arrow;
-  };
 
   const applyZoom = (nextScale: number, anchorX: number, anchorY: number): void => {
     if (!imageElement || nextScale === camera.scale) {
@@ -305,7 +209,7 @@ export const useEditorCanvas = () => {
     if (!canvas) {
       return;
     }
-    const normalizedScale = clamp((fitScale * percent) / 100, MIN_ZOOM, MAX_ZOOM);
+    const normalizedScale = clamp(percent / 100, MIN_ZOOM, MAX_ZOOM);
     applyZoom(normalizedScale, canvas.clientWidth / 2, canvas.clientHeight / 2);
   };
 
@@ -371,7 +275,16 @@ export const useEditorCanvas = () => {
       }
       const bounds = canvas.getBoundingClientRect();
       const currentPoint = screenToWorld(event.clientX - bounds.left, event.clientY - bounds.top);
-      const nextDraft = createDraftShape(drawingStartPoint, currentPoint);
+      const nextDraft = createCanvasElementDraft(
+        activeTool.value,
+        drawingStartPoint,
+        currentPoint,
+        {
+          strokeColor: canvasStore.strokeColor,
+          strokeWidth: canvasStore.strokeWidth,
+        },
+        canvasStore.createElementId(),
+      );
       canvasStore.setDraftElement(nextDraft);
       requestRender();
       return;
@@ -418,24 +331,10 @@ export const useEditorCanvas = () => {
 
     const minSizePx = 12;
     const minWorldSize = minSizePx / camera.scale;
-    if (draftElement.value.type === 'rect' && (draftElement.value.width < minWorldSize || draftElement.value.height < minWorldSize)) {
+    if (!isDrawableElement(draftElement.value, minWorldSize)) {
       canvasStore.clearDraftElement();
       requestRender();
       return;
-    }
-    if (draftElement.value.type === 'circle' && (draftElement.value.rx < minWorldSize / 2 || draftElement.value.ry < minWorldSize / 2)) {
-      canvasStore.clearDraftElement();
-      requestRender();
-      return;
-    }
-    if (draftElement.value.type === 'arrow') {
-      const dx = draftElement.value.x2 - draftElement.value.x1;
-      const dy = draftElement.value.y2 - draftElement.value.y1;
-      if (Math.hypot(dx, dy) < minWorldSize) {
-        canvasStore.clearDraftElement();
-        requestRender();
-        return;
-      }
     }
 
     canvasStore.commitDraftElement();
@@ -482,7 +381,7 @@ export const useEditorCanvas = () => {
     });
 
     imageElement = image;
-    fitImageToView();
+    fitToView();
   };
 
   const initialize = (): void => {
@@ -499,16 +398,18 @@ export const useEditorCanvas = () => {
       resizeObserver.observe(canvasContainerRef.value);
     }
 
-    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-      chrome.storage.local.get('capturedImage', async (result) => {
-        if (!result.capturedImage) {
+    void getCapturedImage()
+      .then(async (capturedImage) => {
+        if (!capturedImage) {
           return;
         }
-        imageUrl.value = result.capturedImage;
-        await loadCapturedImage(result.capturedImage);
+        imageUrl.value = capturedImage;
+        await loadCapturedImage(capturedImage);
         setPanCursor();
+      })
+      .catch((error: unknown) => {
+        console.error('Falha ao carregar imagem capturada:', error);
       });
-    }
   };
 
   const cleanup = (): void => {
@@ -524,9 +425,11 @@ export const useEditorCanvas = () => {
     zoomPercent,
     canvasRef,
     canvasContainerRef,
+    fitToView,
     resetView,
     zoomIn,
     zoomOut,
+    setActualSize,
     setZoomPercent,
     activeTool,
     setActiveTool: (tool: ToolType) => {

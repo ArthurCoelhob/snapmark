@@ -58,5 +58,8 @@ export const useCanvasStore = defineStore('canvas', {
       this.elements = [];
       this.draftElement = null;
     },
+    clearAll() {
+      this.clearElements();
+    },
   },
 });

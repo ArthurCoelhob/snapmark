@@ -5,8 +5,8 @@
       :zoom-percent="zoomPercent"
       @zoom-in="zoomIn"
       @zoom-out="zoomOut"
-      @fit="resetView"
-      @set100="setZoomPercent(100)"
+      @fit="fitToView"
+      @set100="setActualSize"
       @reset-view="resetView"
       @preview="handlePreview"
       @export="handleExport"
@@ -85,10 +85,11 @@ const {
   zoomPercent,
   canvasRef,
   canvasContainerRef,
+  fitToView,
   resetView,
   zoomIn,
   zoomOut,
-  setZoomPercent,
+  setActualSize,
   activeTool,
   setActiveTool,
   handleWheel,
